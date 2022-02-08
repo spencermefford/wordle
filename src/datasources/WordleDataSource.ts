@@ -1,5 +1,7 @@
 /* eslint-disable class-methods-use-this */
-import { DataSource } from 'apollo-datasource';
+import { GameSession } from '@prisma/client';
+import { DataSource, DataSourceConfig } from 'apollo-datasource';
+import { Context } from '../context';
 import words from '../lib/words';
 
 type Letter =
@@ -56,19 +58,56 @@ type GameState = {
   status: GameStatus;
 };
 
+type GameSessionWithState = GameSession & { gameState: GameState };
+
 const MAX_TURNS = 6;
 
-const currentWord = words[0]; // TODO: Eventually get from DB/GameState
+export default class WordleDataSource<
+  TContext extends Context,
+> extends DataSource {
+  context!: TContext;
 
-const gameState: GameState = {
-  turns: [],
-  status: GameStatus.PLAYING,
-}; // TODO: Get from DB using session token
+  override initialize(config: DataSourceConfig<TContext>): void {
+    this.context = config.context;
+  }
 
-export default class WordleDataSource extends DataSource {
-  async playGame(guess: Letter[]) {
+  async createGameSession(): Promise<GameSessionWithState> {
+    const randomWord = words[Math.floor(Math.random() * words.length)];
+    const session = await this.context.prisma.gameSession.create({
+      data: {
+        word: randomWord,
+        gameState: {
+          turns: [],
+          status: GameStatus.PLAYING,
+        },
+      },
+    });
+    return session as GameSessionWithState;
+  }
+
+  async findGameSession(id: string): Promise<GameSessionWithState> {
+    const session = await this.context.prisma.gameSession.findFirst({
+      where: { id },
+    });
+    return session as GameSessionWithState;
+  }
+
+  async updateGameSession(
+    id: string,
+    gameState: GameState,
+  ): Promise<GameSessionWithState> {
+    const session = await this.context.prisma.gameSession.update({
+      where: { id },
+      data: { gameState },
+    });
+    return session as GameSessionWithState;
+  }
+
+  async playGame(guess: Letter[]): Promise<GameSessionWithState> {
+    const session = await this.findGameSession(this.context.sessionId);
+    const { gameState, word: currentWord } = session;
     // Don't keep playing if we're done
-    if (gameState.status !== GameStatus.PLAYING) return gameState;
+    if (gameState.status !== GameStatus.PLAYING) return session;
 
     if (gameState.turns.length >= MAX_TURNS)
       throw new Error(`You can only play ${MAX_TURNS} turns.`);
@@ -91,6 +130,6 @@ export default class WordleDataSource extends DataSource {
     else if (gameState.turns.length >= MAX_TURNS)
       gameState.status = GameStatus.LOSS;
 
-    return gameState;
+    return this.updateGameSession(session.id, gameState);
   }
 }
