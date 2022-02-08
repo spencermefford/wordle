@@ -7,7 +7,6 @@ export const typeDefs = gql`
   }
 
   type Mutation {
-    createGameSession: GameSession!
     playGame(guess: [Letter]!): GameSession!
   }
 
@@ -75,13 +74,10 @@ export const typeDefs = gql`
 export const resolvers: IResolvers = {
   Query: {
     gameSession: async (_, _args, { dataSources, sessionId }) => {
-      return dataSources.wordleDataSource.findGameSession(sessionId);
+      return dataSources.wordleDataSource.findOrCreateGameSession(sessionId);
     },
   },
   Mutation: {
-    createGameSession: async (_, _args, { dataSources }) => {
-      return dataSources.wordleDataSource.createGameSession();
-    },
     playGame: async (_, { guess }, { dataSources }) => {
       return dataSources.wordleDataSource.playGame(guess);
     },

@@ -71,6 +71,13 @@ export default class WordleDataSource<
     this.context = config.context;
   }
 
+  async findOrCreateGameSession(id?: string): Promise<GameSessionWithState> {
+    let session: GameSessionWithState;
+    if (id) session = await this.findGameSession(id);
+    else session = await this.createGameSession();
+    return session;
+  }
+
   async createGameSession(): Promise<GameSessionWithState> {
     const randomWord = words[Math.floor(Math.random() * words.length)];
     const session = await this.context.prisma.gameSession.create({
