@@ -12,7 +12,5 @@ export const context = ({ req }: { req: express.Request }): Context => {
     ? sessionHeader[0]
     : sessionHeader;
 
-  console.log('🚀 ~ file: context.ts ~ line 12 ~ sessionId', sessionId);
-
   return { sessionId: sessionId ?? '', prisma };
 };

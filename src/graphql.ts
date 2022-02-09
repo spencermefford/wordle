@@ -68,6 +68,7 @@ export const typeDefs = gql`
   type GameSession {
     id: ID!
     gameState: GameState
+    word: String
   }
 `;
 

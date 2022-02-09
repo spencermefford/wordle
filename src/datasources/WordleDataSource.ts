@@ -58,7 +58,10 @@ type GameState = {
   status: GameStatus;
 };
 
-type GameSessionWithState = GameSession & { gameState: GameState };
+interface GameSessionWithState extends Omit<GameSession, 'word'> {
+  gameState: GameState;
+  word?: string;
+}
 
 const MAX_TURNS = 6;
 
@@ -71,16 +74,24 @@ export default class WordleDataSource<
     this.context = config.context;
   }
 
-  async findOrCreateGameSession(id?: string): Promise<GameSessionWithState> {
-    let session: GameSessionWithState;
-    if (id) session = await this.findGameSession(id);
-    else session = await this.createGameSession();
-    return session;
+  async findOrCreateGameSession(id?: string): Promise<GameSession> {
+    if (id) {
+      const session = await this.findGameSession(id);
+      if (session) return session;
+    }
+
+    return this.createGameSession();
   }
 
-  async createGameSession(): Promise<GameSessionWithState> {
+  async findGameSession(id: string): Promise<GameSession | null> {
+    return this.context.prisma.gameSession.findFirst({
+      where: { id },
+    });
+  }
+
+  async createGameSession(): Promise<GameSession> {
     const randomWord = words[Math.floor(Math.random() * words.length)];
-    const session = await this.context.prisma.gameSession.create({
+    return this.context.prisma.gameSession.create({
       data: {
         word: randomWord,
         gameState: {
@@ -89,30 +100,24 @@ export default class WordleDataSource<
         },
       },
     });
-    return session as GameSessionWithState;
-  }
-
-  async findGameSession(id: string): Promise<GameSessionWithState> {
-    const session = await this.context.prisma.gameSession.findFirst({
-      where: { id },
-    });
-    return session as GameSessionWithState;
   }
 
   async updateGameSession(
     id: string,
     gameState: GameState,
-  ): Promise<GameSessionWithState> {
-    const session = await this.context.prisma.gameSession.update({
+  ): Promise<GameSession> {
+    return this.context.prisma.gameSession.update({
       where: { id },
       data: { gameState },
     });
-    return session as GameSessionWithState;
   }
 
   async playGame(guess: Letter[]): Promise<GameSessionWithState> {
-    const session = await this.findGameSession(this.context.sessionId);
+    const session = (await this.findGameSession(
+      this.context.sessionId,
+    )) as GameSessionWithState;
     const { gameState, word: currentWord } = session;
+
     // Don't keep playing if we're done
     if (gameState.status !== GameStatus.PLAYING) return session;
 
@@ -121,8 +126,8 @@ export default class WordleDataSource<
 
     const turnGuesses = guess.map<Guess>((letter, i) => {
       let status: TurnStatus;
-      if (currentWord.charAt(i) === letter) status = TurnStatus.CORRECT;
-      else if (currentWord.includes(letter)) status = TurnStatus.ALMOST;
+      if (currentWord?.charAt(i) === letter) status = TurnStatus.CORRECT;
+      else if (currentWord?.includes(letter)) status = TurnStatus.ALMOST;
       else status = TurnStatus.INCORRECT;
 
       return { letter, status };
@@ -137,6 +142,12 @@ export default class WordleDataSource<
     else if (gameState.turns.length >= MAX_TURNS)
       gameState.status = GameStatus.LOSS;
 
-    return this.updateGameSession(session.id, gameState);
+    const updatedSession = (await this.updateGameSession(
+      session.id,
+      gameState,
+    )) as GameSessionWithState;
+    if (gameState.status === GameStatus.PLAYING) delete updatedSession.word;
+
+    return updatedSession;
   }
 }
