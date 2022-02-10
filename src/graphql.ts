@@ -39,7 +39,7 @@ export const typeDefs = gql`
     Z
   }
 
-  enum TurnStatus {
+  enum GuessStatus {
     CORRECT
     INCORRECT
     ALMOST
@@ -47,28 +47,29 @@ export const typeDefs = gql`
 
   type Guess {
     letter: Letter!
-    status: TurnStatus!
-  }
-
-  type Turn {
-    guesses: [Guess]!
+    status: GuessStatus!
   }
 
   enum GameStatus {
-    PLAYING
-    WIN
-    LOSS
+    ACTIVE
+    COMPLETE
   }
 
-  type GameState {
-    turns: [Turn]!
-    status: GameStatus!
+  enum GameResult {
+    WINNER
+    LOSER
+  }
+
+  type Turn {
+    guesses: [Guess]
   }
 
   type GameSession {
     id: ID!
-    gameState: GameState
     word: String
+    status: GameStatus!
+    result: GameResult
+    turns: [Turn]
   }
 `;
 

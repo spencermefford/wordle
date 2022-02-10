@@ -1,7 +1,16 @@
 import express from 'express';
+import DictionaryDataSource from './datasources/DictionaryDataSource';
+// eslint-disable-next-line import/no-cycle
+import WordleDataSource from './datasources/WordleDataSource';
 import { prisma, PrismaClient } from './lib/prisma';
 
+export interface DataSources {
+  wordleDataSource: WordleDataSource;
+  dictionaryDataSource: DictionaryDataSource;
+}
+
 export interface Context {
+  dataSources?: DataSources;
   sessionId: string;
   prisma: PrismaClient;
 }

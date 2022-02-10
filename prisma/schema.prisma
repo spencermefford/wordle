@@ -10,10 +10,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum GameStatus {
+  ACTIVE
+  COMPLETE
+}
+
+enum GameResult {
+  WINNER
+  LOSER
+}
+
 model GameSession {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   word      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  gameState Json?
+  status    GameStatus  @default(ACTIVE)
+  result    GameResult?
+  turns     Json        @default("[]")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }

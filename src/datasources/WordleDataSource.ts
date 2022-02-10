@@ -1,80 +1,26 @@
 /* eslint-disable class-methods-use-this */
-import { GameSession } from '@prisma/client';
+import {
+  Prisma,
+  GameResult,
+  GameSession as PrismaGameSession,
+  GameStatus,
+} from '@prisma/client';
 import { DataSource, DataSourceConfig } from 'apollo-datasource';
+// eslint-disable-next-line import/no-cycle
 import { Context } from '../context';
+import { GameSession, Guess, GuessStatus, Letter } from '../lib/types';
 import words from '../lib/words';
-
-type Letter =
-  | 'A'
-  | 'B'
-  | 'C'
-  | 'D'
-  | 'E'
-  | 'F'
-  | 'G'
-  | 'H'
-  | 'I'
-  | 'J'
-  | 'K'
-  | 'L'
-  | 'M'
-  | 'N'
-  | 'O'
-  | 'P'
-  | 'Q'
-  | 'R'
-  | 'S'
-  | 'T'
-  | 'U'
-  | 'V'
-  | 'W'
-  | 'X'
-  | 'Y'
-  | 'Z';
-
-enum TurnStatus {
-  CORRECT = 'CORRECT',
-  INCORRECT = 'INCORRECT',
-  ALMOST = 'ALMOST',
-}
-
-type Guess = {
-  letter: Letter;
-  status: TurnStatus;
-};
-
-type Turn = {
-  guesses: Guess[];
-};
-
-enum GameStatus {
-  PLAYING = 'PLAYING',
-  WIN = 'WIN',
-  LOSS = 'LOSS',
-}
-
-type GameState = {
-  turns: Turn[];
-  status: GameStatus;
-};
-
-interface GameSessionWithState extends Omit<GameSession, 'word'> {
-  gameState: GameState;
-  word?: string;
-}
 
 const MAX_TURNS = 6;
 
-export default class WordleDataSource<
-  TContext extends Context,
-> extends DataSource {
-  context!: TContext;
+export default class WordleDataSource extends DataSource {
+  context!: Context;
 
-  override initialize(config: DataSourceConfig<TContext>): void {
+  override initialize(config: DataSourceConfig<Context>): void {
     this.context = config.context;
   }
 
-  async findOrCreateGameSession(id?: string): Promise<GameSession> {
+  async findOrCreateGameSession(id?: string): Promise<PrismaGameSession> {
     if (id) {
       const session = await this.findGameSession(id);
       if (session) return session;
@@ -83,70 +29,67 @@ export default class WordleDataSource<
     return this.createGameSession();
   }
 
-  async findGameSession(id: string): Promise<GameSession | null> {
+  async findGameSession(id: string): Promise<PrismaGameSession | null> {
     return this.context.prisma.gameSession.findFirst({
       where: { id },
     });
   }
 
-  async createGameSession(): Promise<GameSession> {
+  async createGameSession(): Promise<PrismaGameSession> {
     const randomWord = words[Math.floor(Math.random() * words.length)];
     return this.context.prisma.gameSession.create({
       data: {
         word: randomWord,
-        gameState: {
-          turns: [],
-          status: GameStatus.PLAYING,
-        },
       },
     });
   }
 
-  async updateGameSession(
-    id: string,
-    gameState: GameState,
-  ): Promise<GameSession> {
-    return this.context.prisma.gameSession.update({
-      where: { id },
-      data: { gameState },
-    });
-  }
-
-  async playGame(guess: Letter[]): Promise<GameSessionWithState> {
+  async playGame(letters: Letter[]): Promise<GameSession> {
+    const sessionUpdates: Partial<GameSession> = {};
     const session = (await this.findGameSession(
       this.context.sessionId,
-    )) as GameSessionWithState;
-    const { gameState, word: currentWord } = session;
+    )) as unknown as GameSession;
+    const { status, turns, word: currentWord } = session;
 
     // Don't keep playing if we're done
-    if (gameState.status !== GameStatus.PLAYING) return session;
+    if (status !== GameStatus.ACTIVE) return session;
 
-    if (gameState.turns.length >= MAX_TURNS)
+    // You can't play more than 6 times
+    if (turns.length >= MAX_TURNS)
       throw new Error(`You can only play ${MAX_TURNS} turns.`);
 
-    const turnGuesses = guess.map<Guess>((letter, i) => {
-      let status: TurnStatus;
-      if (currentWord?.charAt(i) === letter) status = TurnStatus.CORRECT;
-      else if (currentWord?.includes(letter)) status = TurnStatus.ALMOST;
-      else status = TurnStatus.INCORRECT;
+    // Build the guesses response
+    const guesses = letters.map<Guess>((letter, i) => {
+      let guessStatus: GuessStatus;
+      if (currentWord?.charAt(i) === letter) {
+        guessStatus = GuessStatus.CORRECT;
+      } else if (currentWord?.includes(letter)) {
+        guessStatus = GuessStatus.ALMOST;
+      } else {
+        guessStatus = GuessStatus.INCORRECT;
+      }
 
-      return { letter, status };
+      return { letter, status: guessStatus };
     });
 
-    gameState.turns = [...gameState.turns, { guesses: turnGuesses }];
+    // Is the game over?
+    const isWinner = guesses.every((g) => g.status === GuessStatus.CORRECT);
+    const isLastTurn = turns.length === MAX_TURNS - 1;
+    if (isWinner || isLastTurn) {
+      sessionUpdates.status = GameStatus.COMPLETE;
+      sessionUpdates.result = isWinner ? GameResult.WINNER : GameResult.LOSER;
+    }
 
-    const isWinner = turnGuesses.every(
-      ({ status }) => status === TurnStatus.CORRECT,
-    );
-    if (isWinner) gameState.status = GameStatus.WIN;
-    else if (gameState.turns.length >= MAX_TURNS)
-      gameState.status = GameStatus.LOSS;
+    const updatedSession = (await this.context.prisma.gameSession.update({
+      where: { id: session.id },
+      data: {
+        ...sessionUpdates,
+        turns: [...turns, { guesses }] as unknown as Prisma.JsonArray,
+      },
+    })) as unknown as GameSession;
 
-    const updatedSession = (await this.updateGameSession(
-      session.id,
-      gameState,
-    )) as GameSessionWithState;
-    if (gameState.status === GameStatus.PLAYING) delete updatedSession.word;
+    // Don't show the word until the game is over
+    if (updatedSession.status === GameStatus.ACTIVE) delete updatedSession.word;
 
     return updatedSession;
   }
