@@ -1,5 +1,6 @@
+/* eslint-disable react/no-array-index-key */
 import classNames from 'classnames';
-import { GameSession, Letter, GuessStatus } from '../../backend/src/lib/types';
+import { GameSession } from '../../backend/src/lib/types';
 
 const keys = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -38,7 +39,7 @@ export default function GameKeyboard({ session, onClick }: GameKeyboardProps) {
     <>
       {keys.map((keyRow, i) => {
         return (
-          <div className="flex justify-center" key={i}>
+          <div className="flex justify-center" key={`row-${i}`}>
             {keyRow.map((key) => (
               <Key session={session} value={key} key={key} onClick={onClick} />
             ))}
