@@ -1,8 +1,14 @@
 /* eslint-disable react/no-array-index-key */
 import classNames from 'classnames';
 import { EMPTY_GUESS, MAX_TURNS } from '../lib/const';
+import { GameSession, Letter, GuessStatus } from '../../backend/src/lib/types';
 
-function Cell({ letter, status }) {
+interface CellProps {
+  letter?: Letter | null;
+  status?: GuessStatus | null;
+}
+
+function Cell({ letter, status }: CellProps) {
   return (
     <div
       className={classNames(
@@ -20,7 +26,18 @@ function Cell({ letter, status }) {
   );
 }
 
-export default function GameGrid({ session, currentGuess, className }) {
+Cell.defaultProps = {
+  letter: null,
+  status: null,
+};
+
+interface GameGridProps {
+  session: GameSession;
+  currentGuess: (Letter | null)[];
+  className?: string;
+}
+
+export default function GameGrid({ session, currentGuess, className }: GameGridProps) {
   const { turns } = session;
   const emptyRows = turns.length < MAX_TURNS ? new Array(MAX_TURNS - turns.length - 1).fill('') : [];
 
@@ -38,3 +55,7 @@ export default function GameGrid({ session, currentGuess, className }) {
     </div>
   );
 }
+
+GameGrid.defaultProps = {
+  className: '',
+};

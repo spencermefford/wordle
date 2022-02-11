@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { EMPTY_GUESS } from '../lib/const';
 import GameGrid from './GameGrid';
 import GameKeyboard from './GameKeyboard';
+import { GameSession, Letter } from '../../backend/src/lib/types';
 
 const GAME_SESSION_FIELDS = gql`
   fragment GameSessionFields on GameSession {
@@ -38,13 +39,25 @@ const PLAY_GAME = gql`
   }
 `;
 
+interface GameSessionResponse {
+  gameSession: GameSession;
+}
+
+interface PlayGameResponse {
+  playGame: GameSession;
+}
+
 export default function Game() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentGuess, setCurrentGuess] = useState(EMPTY_GUESS);
-  const { loading: sessionLoading, error: sessionError, data: sessionData } = useQuery(GET_GAME_SESSION);
-  const [playGame, { loading: playLoading, error: playError }] = useMutation(PLAY_GAME);
+  const [currentGuess, setCurrentGuess] = useState<(Letter | null)[]>(EMPTY_GUESS);
+  const {
+    loading: sessionLoading,
+    error: sessionError,
+    data: sessionData,
+  } = useQuery<GameSessionResponse>(GET_GAME_SESSION);
+  const [playGame, { loading: playLoading, error: playError }] = useMutation<PlayGameResponse>(PLAY_GAME);
 
-  const session = sessionData?.gameSession ?? {};
+  const session = sessionData?.gameSession;
   if (session?.id) {
     setCookies('sesh', session.id);
   }
@@ -60,7 +73,7 @@ export default function Game() {
         case '⌫':
           if (currentIndex > 0) {
             const newGuess = [...currentGuess];
-            newGuess[currentIndex - 1] = '';
+            newGuess[currentIndex - 1] = null;
             setCurrentIndex(currentIndex - 1);
             setCurrentGuess(newGuess);
           }

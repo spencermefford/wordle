@@ -1,4 +1,5 @@
 import classNames from 'classnames';
+import { GameSession, Letter, GuessStatus } from '../../backend/src/lib/types';
 
 const keys = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -6,7 +7,13 @@ const keys = [
   ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫'],
 ];
 
-function Key({ session, value: key, onClick }) {
+interface KeyProps {
+  session: GameSession;
+  value: string;
+  onClick: (key: string) => void;
+}
+
+function Key({ session, value: key, onClick }: KeyProps) {
   return (
     <button
       type="button"
@@ -21,12 +28,17 @@ function Key({ session, value: key, onClick }) {
   );
 }
 
-export default function GameKeyboard({ session, onClick }) {
+interface GameKeyboardProps {
+  session: GameSession;
+  onClick: (key: string) => void;
+}
+
+export default function GameKeyboard({ session, onClick }: GameKeyboardProps) {
   return (
     <>
-      {keys.map((keyRow) => {
+      {keys.map((keyRow, i) => {
         return (
-          <div className="flex justify-center" key={keyRow}>
+          <div className="flex justify-center" key={i}>
             {keyRow.map((key) => (
               <Key session={session} value={key} key={key} onClick={onClick} />
             ))}
